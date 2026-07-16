@@ -1,0 +1,578 @@
+/* Основные переменные и темы */
+:root {
+    --primary: #2ecc71;
+    --primary-hover: #27ae60;
+    --bg-color: #ffffff;
+    --text-color: #1a1a1a;
+    --card-bg: #f8f9fa;
+    --shadow: 0 8px 30px rgba(0,0,0,0.05);
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --control-bg: rgba(46, 204, 113, 0.1);
+    --border-color: rgba(46, 204, 113, 0.2);
+}
+
+[data-theme="dark"] {
+    --bg-color: #121212;
+    --text-color: #ffffff;
+    --card-bg: #1e1e1e;
+    --shadow: 0 8px 30px rgba(0,0,0,0.4);
+    --glass-bg: rgba(18, 18, 18, 0.85);
+    --control-bg: rgba(255, 255, 255, 0.05);
+    --border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Защита от выделения */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    transition: background-color 0.4s ease, color 0.4s ease;
+    padding-bottom: 220px; /* Место под увеличенную корзину */
+    overflow-x: hidden;
+}
+
+/* Шапка */
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    position: sticky;
+    top: 0;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 100;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+}
+
+.logo-img {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    object-position: top; /* Показываем только верхнюю часть логотипа (без текста) */
+    border-radius: 50%;
+}
+
+.logo-text {
+    font-family: 'Kaushan Script', cursive;
+    font-size: 28px;
+    color: var(--primary);
+    letter-spacing: 1px;
+    line-height: 1;
+}
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.theme-toggle {
+    background: var(--control-bg);
+    border: none;
+    font-size: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-color);
+    transition: transform 0.2s, background 0.3s;
+}
+
+.theme-toggle:active {
+    transform: scale(0.9);
+}
+
+.scroll-to-menu {
+    background-color: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3);
+}
+
+/* Главный экран (Hero) */
+.hero {
+    padding: 40px 20px;
+    text-align: center;
+    background: linear-gradient(145deg, rgba(46, 204, 113, 0.15), transparent);
+    border-radius: 0 0 35px 35px;
+    margin-bottom: 35px;
+}
+
+.hero h1 {
+    font-size: 28px;
+    line-height: 1.2;
+    margin-bottom: 12px;
+    font-weight: 700;
+}
+
+.hero p {
+    font-size: 16px;
+    opacity: 0.8;
+    max-width: 400px;
+    margin: 0 auto;
+    line-height: 1.5;
+}
+
+/* Горизонтальное меню категорий */
+.categories-nav {
+    display: flex;
+    overflow-x: auto;
+    gap: 10px;
+    padding: 10px 20px;
+    margin-bottom: 20px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    position: sticky;
+    top: 73px;
+    background: var(--bg-color);
+    z-index: 90;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.4s ease;
+}
+
+.categories-nav::-webkit-scrollbar {
+    display: none;
+}
+
+.category-pill {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+}
+
+.category-pill.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3);
+}
+
+/* Заголовок секции */
+.section-title {
+    font-size: 24px;
+    margin: 0 20px 20px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+}
+
+.menu-grid-container {
+    padding: 0 20px;
+}
+
+/* Сетка блюд */
+.menu-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+}
+
+/* Карточка блюда */
+.card {
+    background-color: var(--card-bg);
+    border-radius: 22px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    transition: background-color 0.4s ease;
+}
+
+.card-img {
+    width: 100%;
+    height: 130px;
+    object-fit: cover;
+    background-color: #ddd;
+}
+
+.card-content {
+    padding: 15px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.card-title {
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 1.3;
+    margin-bottom: 6px;
+}
+
+.card-price {
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 18px;
+    margin-bottom: 15px;
+}
+
+/* Кнопки управления количеством */
+.controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--control-bg);
+    border-radius: 30px;
+    padding: 6px;
+}
+
+.controls button {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    transition: transform 0.1s, background 0.2s;
+}
+
+.controls button:active {
+    transform: scale(0.9);
+    background-color: var(--primary);
+    color: #fff;
+}
+
+.controls .count {
+    font-weight: 600;
+    font-size: 16px;
+    min-width: 24px;
+    text-align: center;
+}
+
+/* Плавающая корзина */
+.sticky-bar {
+    position: fixed;
+    bottom: -500px; /* Скрыта по умолчанию */
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 30px);
+    max-width: 500px;
+    padding: 16px 20px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 25px;
+    display: flex;
+    flex-direction: column;
+    transition: bottom 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 1000;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    border: 1px solid var(--border-color);
+}
+
+.sticky-bar.visible {
+    bottom: 20px;
+}
+
+/* Конфигурация заказа (Доставка/Самовывоз) */
+.order-config {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.delivery-tabs {
+    display: flex;
+    background: var(--control-bg);
+    border-radius: 12px;
+    padding: 4px;
+}
+
+.delivery-tabs button {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    border-radius: 10px;
+    color: var(--text-color);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s, box-shadow 0.3s;
+    font-family: inherit;
+}
+
+.delivery-tabs button.active {
+    background: var(--card-bg);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.delivery-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+    overflow: hidden;
+}
+
+.delivery-fields.hidden {
+    display: none;
+}
+
+.form-control {
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-user-select: text; /* Разрешаем выделение текста внутри инпута */
+    user-select: text;
+}
+
+.form-control:focus {
+    border-color: var(--primary);
+}
+
+/* Итоговая строка в корзине */
+.order-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border-color);
+    padding-top: 16px;
+}
+
+.order-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.order-items {
+    font-size: 13px;
+    opacity: 0.8;
+    margin-bottom: 2px;
+}
+
+.order-total {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.order-btn {
+    background-color: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 14px 22px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.2s;
+}
+
+.order-btn:active {
+    transform: scale(0.95);
+}
+
+.clear-cart-btn {
+    background: none;
+    border: 1px solid rgba(255, 80, 80, 0.4);
+    color: #ff5050;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.1s;
+    flex-shrink: 0;
+}
+
+.clear-cart-btn:active {
+    transform: scale(0.9);
+    background: rgba(255, 80, 80, 0.1);
+}
+
+/* Баннер экономии */
+.savings-banner {
+    display: none;
+    background: linear-gradient(135deg, #2ecc71, #27ae60);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border-radius: 12px;
+    text-align: center;
+    animation: pop-in 0.3s ease;
+    margin-bottom: 10px;
+}
+
+@keyframes pop-in {
+    from { transform: scale(0.9); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+}
+
+/* Подвал */
+footer {
+    text-align: center;
+    padding: 30px 20px;
+    font-size: 13px;
+    opacity: 0.6;
+    margin-top: 20px;
+    line-height: 1.6;
+}
+
+footer a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+/* Экран выбора филиала */
+.branch-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-color);
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px 20px;
+    text-align: center;
+}
+
+.branch-overlay.hidden {
+    display: none;
+}
+
+.branch-overlay h2 {
+    font-size: 22px;
+    margin-bottom: 8px;
+    font-weight: 700;
+}
+
+.branch-overlay p {
+    opacity: 0.75;
+    font-size: 14px;
+    margin-bottom: 28px;
+    max-width: 320px;
+}
+
+.branch-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    max-width: 320px;
+}
+
+.branch-option {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 16px 20px;
+    border-radius: 16px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: transform 0.15s, background 0.2s;
+}
+
+.branch-option:active {
+    transform: scale(0.97);
+    background-color: var(--primary);
+    color: #fff;
+}
+
+/* Кнопка смены филиала в шапке */
+.branch-badge {
+    background: var(--control-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+/* Субвыбор для лимонадов: объем + вкус */
+.volume-tabs {
+    display: flex;
+    gap: 10px;
+    padding: 0 20px;
+    margin-bottom: 18px;
+}
+
+.volume-tab {
+    flex: 1;
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-color);
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.volume-tab.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3);
+}
+
+/* Заглушки изображений из Unsplash */
+.placeholder-plov { background: url('https://images.unsplash.com/photo-1590301157890-4810ed352733?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80') center/cover; }
+.placeholder-shashlyk { background: url('https://images.unsplash.com/photo-1555939594-58d7cb561ad1?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80') center/cover; }
+.placeholder-tea { background: url('https://images.unsplash.com/photo-1576092768241-dec231879fc3?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80') center/cover; }
+.placeholder-baursak { background: url('https://images.unsplash.com/photo-1628192323386-88005eb391f1?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80') center/cover; }
+

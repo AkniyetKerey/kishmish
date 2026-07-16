@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kish-Mish - Онлайн Меню</title>
+    <!-- Подключение современного шрифта и шрифта для логотипа -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Kaushan+Script&display=swap" rel="stylesheet">
+    <link rel="shortcut icon" href="./logo.png" type="image/png">
+    <link rel="icon" href="./logo.png" type="image/png">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body oncontextmenu="return false;">
+
+    <header>
+        <a href="https://www.instagram.com/kish.mish.aktau/" target="_blank" class="logo-container">
+            <img src="logo.png" alt="Kish-Mish Logo" class="logo-img">
+            <span class="logo-text">Kish-Mish</span>
+        </a>
+        <div class="header-controls">
+            <button class="branch-badge" id="branch-badge" onclick="openBranchOverlay()">📍 Филиал</button>
+            <button class="scroll-to-menu" onclick="document.getElementById('menu').scrollIntoView({behavior: 'smooth'})">Меню</button>
+            <button class="theme-toggle" id="theme-toggle">🌙</button>
+        </div>
+    </header>
+
+    <!-- Экран выбора филиала -->
+    <div class="branch-overlay" id="branch-overlay">
+        <h2>Выберите филиал 📍</h2>
+        <p>Меню и способ оформления заказа зависят от выбранной точки. Вы всегда сможете сменить её позже.</p>
+        <div class="branch-list">
+            <button class="branch-option" onclick="selectBranch('27-71')">Точка: 27-71</button>
+            <button class="branch-option" onclick="selectBranch('28-63')">Точка: 28-63</button>
+            <button class="branch-option" onclick="selectBranch('17-95')">Точка: 17-95</button>
+        </div>
+        <button class="branch-badge" id="branch-cancel" style="margin-top: 22px; display: none;" onclick="closeBranchOverlay()">Отмена</button>
+    </div>
+
+    <div class="hero">
+        <h1>Добро пожаловать! 🍵</h1>
+        <p>Выбирайте блюда, калькулятор сам посчитает заказ</p>
+    </div>
+
+    <nav class="categories-nav" id="categories-nav"></nav>
+    <div id="menu"></div>
+
+    <!-- Плавающая корзина -->
+    <div class="sticky-bar" id="sticky-bar">
+        <!-- Баннер экономии внутри корзины -->
+        <div class="savings-banner" id="savings-banner">✨ Отлично! Вы сэкономили 300 тг на доставке!</div>
+
+        <div class="order-config">
+            <div class="delivery-tabs">
+                <button class="tab active" data-type="delivery">Доставка</button>
+                <button class="tab" data-type="pickup">Самовывоз</button>
+            </div>
+
+            <div class="delivery-fields" id="delivery-fields">
+                <input type="hidden" id="point-select" value="27-71">
+                <input type="text" class="form-control" id="address-input" placeholder="Улица, дом, квартира" />
+            </div>
+        </div>
+
+            <div class="order-summary-row">
+                <div class="order-info">
+                    <span class="order-items" id="total-items">Выбрано: 0 позиций</span>
+                    <span class="order-breakdown" id="order-breakdown" style="font-size: 11px; opacity: 0.7; margin-bottom: 2px;"></span>
+                    <span class="order-total" id="total-price">0 тг</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button class="clear-cart-btn" id="clear-cart-btn" title="Очистить корзину">🗑️</button>
+                    <button class="order-btn" id="order-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                        Заказать
+                    </button>
+                </div>
+            </div>
+    </div>
+
+    <footer>
+        <p>© 2026 Разработка интерактивных систем для бизнеса.<br>
+        Хотите такой же сайт? Контакты разработчика: <a href="https://wa.me/77759321308" target="_blank">[whatsapp:7759321308]</a></p>
+    </footer>
+
+    <!-- Порядок важен: config -> данные меню -> сервисный слой api -> корзина -> меню -> main (инициализация) -->
+    <script src="js/config.js"></script>
+    <script src="data.js?v=3"></script>
+    <script src="js/api.js"></script>
+    <script src="js/cart.js"></script>
+    <script src="js/menu.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
