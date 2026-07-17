@@ -32,15 +32,13 @@ function selectBranch(branch) {
         } catch (e) {}
 
         alert(`Точка изменена на ${branch}. Корзина была очищена, так как на другой точке меню может отличаться.`);
-        window.location.reload();
-        return;
     }
 
-    const badge = document.getElementById('branch-badge');
-    if (badge) badge.textContent = `📍 ${branch}`;
-
-    const pointSelect = document.getElementById('point-select');
-    if (pointSelect) pointSelect.value = branch;
+    // Перезагружаем страницу в любом случае (даже при первом выборе) —
+    // у каждой точки своё меню, и его нужно заново запросить через api.getMenu()
+    // с уже сохранённым branch, а не полагаться на то, что успело отрисоваться
+    // при самой первой загрузке страницы (тогда branch ещё не был известен).
+    window.location.reload();
 }
 
 function openBranchOverlay() {
