@@ -16,19 +16,23 @@ let menuCategories = []; // категории меню, переданные и
 let menuItems = [];
 let trendingItems = [];
 
-/** Разворачивает переданные категории в плоский список товаров (для корзины/заказа) */
+/**
+ * Разворачивает переданные категории в плоский список товаров (для корзины/заказа).
+ * Замороженные товары (item.frozen === true) сюда не попадают — они временно
+ * скрыты с сайта, но не удалены (см. "заморозка" в админке).
+ */
 function buildMenuItemsIndex() {
     menuItems = [];
     menuCategories.forEach(cat => {
-        menuItems = menuItems.concat(cat.items);
+        menuItems = menuItems.concat(cat.items.filter(item => !item.frozen));
     });
 }
 
-/** Собирает список товаров для блока "🔥 В тренде" по ключевым словам */
+/** Собирает список товаров для блока "🔥 В тренде" по ключевым словам (без замороженных) */
 function buildTrendingItems() {
     trendingItems = [];
     menuCategories.forEach(cat => {
-        cat.items.forEach(item => {
+        cat.items.filter(item => !item.frozen).forEach(item => {
             const isTrending = TRENDING_KEYWORDS.some(kw => item.name.toLowerCase().includes(kw));
             if (isTrending && !trendingItems.find(i => i.id === item.id)) {
                 trendingItems.push(item);
@@ -39,14 +43,29 @@ function buildTrendingItems() {
 
 /** Общая разметка карточки товара — переиспользуется всеми видами рендера */
 function cardContentHtml(item, displayName) {
+    const name = displayName || item.name;
     const description = item.description
         ? `<div style="font-size: 13px; opacity: 0.7; margin-bottom: 8px; line-height: 1.2;">${item.description}</div>`
         : '';
 
+    // Замороженный товар: показываем карточку, но без цены и без возможности
+    // добавить в корзину — вместо этого понятное сообщение для клиента.
+    if (item.frozen) {
+        return `
+            <div class="card-content">
+                <div>
+                    <div class="card-title">${name}</div>
+                    ${description}
+                    <div class="card-unavailable">Временно недоступно</div>
+                </div>
+            </div>
+        `;
+    }
+
     return `
         <div class="card-content">
             <div>
-                <div class="card-title">${displayName || item.name}</div>
+                <div class="card-title">${name}</div>
                 ${description}
                 <div class="card-price">${item.price} тг</div>
             </div>
@@ -66,7 +85,7 @@ function renderGrid(items, title) {
 
     items.forEach(item => {
         const card = document.createElement('div');
-        card.className = 'card';
+        card.className = 'card' + (item.frozen ? ' card-frozen' : '');
         card.innerHTML = cardContentHtml(item);
         grid.appendChild(card);
     });
@@ -106,7 +125,7 @@ function renderVariantCategory(cat) {
 
         function makeVariantCard(item) {
             const card = document.createElement('div');
-            card.className = 'card';
+            card.className = 'card' + (item.frozen ? ' card-frozen' : '');
             card.innerHTML = cardContentHtml(item, item.flavor || item.name);
             return card;
         }
@@ -139,6 +158,21 @@ function renderSizePickerCategory(cat) {
     const grid = menuContainer.querySelector('#size-picker-grid');
 
     function renderProductCard(card, product) {
+        card.className = 'card' + (product.frozen ? ' card-frozen' : '');
+
+        // Замороженный продукт целиком: без выбора размера и без корзины
+        if (product.frozen) {
+            card.innerHTML = `
+                <div class="card-content">
+                    <div>
+                        <div class="card-title">${product.name}</div>
+                        <div class="card-unavailable">Временно недоступно</div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
         if (card._selectedSizeIdx === undefined) card._selectedSizeIdx = 0;
         const selectedIdx = card._selectedSizeIdx;
         const size = product.sizes[selectedIdx];
