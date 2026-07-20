@@ -8,6 +8,7 @@
 
 let currentBranch = BRANCHES[0];
 let categories = [];
+let isSaving = false; // защита от повторного/параллельного сохранения (см. persistAndRender)
 
 const root = document.getElementById('admin-root');
 
@@ -16,18 +17,48 @@ function generateId() {
     return Date.now() + Math.floor(Math.random() * 1000);
 }
 
-/** Сохраняет текущее состояние categories для currentBranch и перерисовывает экран */
+/**
+ * Сохраняет текущее состояние categories для currentBranch и перерисовывает экран.
+ *
+ * Пока идёт сохранение — isSaving = true, и все действия (добавить/удалить/
+ * заморозить и т.п.) блокируются с понятным сообщением. Раньше без этой
+ * защиты нетерпеливый повторный клик по кнопке во время долгого сохранения
+ * запускал ВТОРОЕ параллельное сохранение, и они начинали мешать друг другу
+ * (одно удаляло то, что другое только что вставило) — отсюда были ошибки
+ * 409 Conflict и задвоенные категории.
+ */
 async function persistAndRender() {
+    if (isSaving) {
+        alert('Сохранение уже идёт, подождите несколько секунд и попробуйте снова.');
+        return;
+    }
+
+    isSaving = true;
+    renderSavingOverlay();
+
     const result = await api.saveMenu(currentBranch, categories);
+
+    isSaving = false;
+
     if (!result.success) {
         alert('Не удалось сохранить: ' + (result.error || 'неизвестная ошибка'));
     }
     render();
 }
 
+/** Показывает простой индикатор "идёт сохранение" поверх админки */
+function renderSavingOverlay() {
+    root.innerHTML = '<p class="admin-empty-hint">💾 Сохраняем изменения, не закрывайте страницу...</p>';
+}
+
 /** Переключение филиала в админке */
 async function switchBranch(branch) {
+    if (isSaving) {
+        alert('Дождитесь окончания сохранения перед переключением филиала.');
+        return;
+    }
     currentBranch = branch;
+    renderSavingOverlay();
     categories = await api.getMenu(branch);
     render();
 }
@@ -135,15 +166,26 @@ function editRawJson(catIndex) {
 
 /** Переносит текущее меню из data.js в БД (Supabase или localStorage) — разовое действие */
 async function migrateFromDataJs() {
+    if (isSaving) {
+        alert('Сохранение уже идёт, подождите несколько секунд и попробуйте снова.');
+        return;
+    }
     if (typeof menuData === 'undefined' || menuData.length === 0) {
         alert('data.js не найден или пуст — переносить нечего.');
         return;
     }
     if (!confirm(`Перенести меню из data.js (${menuData.length} категорий) в базу для текущего филиала? Это ЗАМЕНИТ то, что сейчас там сохранено.`)) return;
 
+    isSaving = true;
+    renderSavingOverlay();
+
     const result = await api.saveMenu(currentBranch, menuData);
+
+    isSaving = false;
+
     if (!result.success) {
         alert('Не удалось перенести: ' + (result.error || 'неизвестная ошибка'));
+        render();
         return;
     }
     alert('Готово! Меню перенесено.');

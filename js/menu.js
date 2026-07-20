@@ -24,7 +24,8 @@ let trendingItems = [];
 function buildMenuItemsIndex() {
     menuItems = [];
     menuCategories.forEach(cat => {
-        menuItems = menuItems.concat(cat.items.filter(item => !item.frozen));
+        const items = Array.isArray(cat.items) ? cat.items : [];
+        menuItems = menuItems.concat(items.filter(item => !item.frozen));
     });
 }
 
@@ -32,7 +33,8 @@ function buildMenuItemsIndex() {
 function buildTrendingItems() {
     trendingItems = [];
     menuCategories.forEach(cat => {
-        cat.items.filter(item => !item.frozen).forEach(item => {
+        const items = Array.isArray(cat.items) ? cat.items : [];
+        items.filter(item => !item.frozen).forEach(item => {
             const isTrending = TRENDING_KEYWORDS.some(kw => item.name.toLowerCase().includes(kw));
             if (isTrending && !trendingItems.find(i => i.id === item.id)) {
                 trendingItems.push(item);
@@ -100,7 +102,7 @@ function renderVariantCategory(cat) {
     let selectedVolume = cat.volumes[0];
 
     function renderVolume() {
-        const itemsForVolume = cat.items.filter(i => i.volume === selectedVolume);
+        const itemsForVolume = (Array.isArray(cat.items) ? cat.items : []).filter(i => i.volume === selectedVolume);
 
         menuContainer.innerHTML = `
             <h2 class="section-title">${cat.category}</h2>
@@ -207,7 +209,7 @@ function renderSizePickerCategory(cat) {
         card.querySelector('[data-action="inc"]').addEventListener('click', () => updateCart(size.id, 1));
     }
 
-    cat.products.forEach(product => {
+    (Array.isArray(cat.products) ? cat.products : []).forEach(product => {
         const card = document.createElement('div');
         card.className = 'card';
         grid.appendChild(card);
@@ -230,21 +232,26 @@ function renderCategoriesNav() {
     categoriesNav.appendChild(trendBtn);
 
     menuCategories.forEach(cat => {
-        const btn = document.createElement('button');
-        btn.className = 'category-pill';
-        btn.textContent = cat.category;
-        btn.onclick = () => {
-            document.querySelectorAll('.category-pill').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            if (cat.hasVariants) {
-                renderVariantCategory(cat);
-            } else if (cat.hasSizePicker) {
-                renderSizePickerCategory(cat);
-            } else {
-                renderGrid(cat.items, cat.category);
-            }
-        };
-        categoriesNav.appendChild(btn);
+        try {
+            const btn = document.createElement('button');
+            btn.className = 'category-pill';
+            btn.textContent = cat.category;
+            btn.onclick = () => {
+                document.querySelectorAll('.category-pill').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                if (cat.hasVariants) {
+                    renderVariantCategory(cat);
+                } else if (cat.hasSizePicker) {
+                    renderSizePickerCategory(cat);
+                } else {
+                    renderGrid(Array.isArray(cat.items) ? cat.items : [], cat.category);
+                }
+            };
+            categoriesNav.appendChild(btn);
+        } catch (e) {
+            // Одна битая категория не должна ронять всю навигацию по меню
+            console.error('Пропущена некорректная категория:', cat, e);
+        }
     });
 }
 

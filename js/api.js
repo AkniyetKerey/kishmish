@@ -178,6 +178,15 @@ async function saveMenu(branch, categories) {
     // затем вставляем всё заново из текущего состояния админки. Так админка
     // не должна отслеживать, что именно изменилось — она просто каждый раз
     // отдаёт актуальный полный список категорий.
+    //
+    // Важно: вставляем ПАЧКАМИ (одним запросом на всю таблицу), а не по одной
+    // строке за раз. Раньше здесь был цикл с insert() на каждую категорию/
+    // товар/продукт по отдельности — для реального меню (300+ позиций) это
+    // означало 60+ последовательных запросов, что и медленно, и рискованно:
+    // если пользователь в нетерпении нажимал кнопку сохранения ещё раз, два
+    // параллельных сохранения начинали мешать друг другу (один удалял то,
+    // что второй только что вставил) — отсюда 409 Conflict и задвоенные категории.
+    // Сейчас весь перенос — это максимум 5 запросов, независимо от размера меню.
     try {
         const { error: delError } = await supabaseClient
             .from('categories')
@@ -185,63 +194,84 @@ async function saveMenu(branch, categories) {
             .eq('branch', targetBranch);
         if (delError) throw delError;
 
-        for (let i = 0; i < categories.length; i++) {
-            const cat = categories[i];
+        if (categories.length === 0) return { success: true };
 
-            const { data: insertedCat, error: catError } = await supabaseClient
-                .from('categories')
-                .insert({
-                    branch: targetBranch,
-                    category: cat.category,
-                    has_variants: !!cat.hasVariants,
-                    has_size_picker: !!cat.hasSizePicker,
-                    volumes: cat.volumes || null,
-                    sort_order: i
-                })
-                .select()
-                .single();
-            if (catError) throw catError;
+        // 1) Вставляем ВСЕ категории одним запросом, получаем их id одним ответом
+        const categoriesPayload = categories.map((cat, i) => ({
+            branch: targetBranch,
+            category: cat.category,
+            has_variants: !!cat.hasVariants,
+            has_size_picker: !!cat.hasSizePicker,
+            volumes: cat.volumes || null,
+            sort_order: i
+        }));
+        const { data: insertedCats, error: catError } = await supabaseClient
+            .from('categories')
+            .insert(categoriesPayload)
+            .select();
+        if (catError) throw catError;
+
+        // 2) Собираем общие списки товаров/продуктов по ВСЕМ категориям сразу
+        const itemsPayload = [];
+        const productsPayload = [];
+        const sizesByProductPosition = []; // sizes[], по индексу совпадает с productsPayload
+
+        categories.forEach((cat, catIdx) => {
+            const insertedCat = insertedCats[catIdx];
 
             if (cat.hasSizePicker && Array.isArray(cat.products)) {
-                for (const product of cat.products) {
-                    const { data: insertedProduct, error: prodError } = await supabaseClient
-                        .from('products')
-                        .insert({
-                            category_id: insertedCat.id,
-                            name: product.name,
-                            frozen: !!product.frozen
-                        })
-                        .select()
-                        .single();
-                    if (prodError) throw prodError;
+                cat.products.forEach(product => {
+                    productsPayload.push({
+                        category_id: insertedCat.id,
+                        name: product.name,
+                        frozen: !!product.frozen
+                    });
+                    sizesByProductPosition.push(Array.isArray(product.sizes) ? product.sizes : []);
+                });
+            } else if (Array.isArray(cat.items)) {
+                cat.items.forEach(item => {
+                    itemsPayload.push({
+                        category_id: insertedCat.id,
+                        name: item.name,
+                        price: item.price,
+                        description: item.description || '',
+                        volume: item.volume || null,
+                        flavor: item.flavor || null,
+                        group_name: item.group || null,
+                        frozen: !!item.frozen
+                    });
+                });
+            }
+        });
 
-                    if (Array.isArray(product.sizes) && product.sizes.length > 0) {
-                        const sizesPayload = product.sizes.map(s => ({
-                            product_id: insertedProduct.id,
-                            volume: s.volume,
-                            price: s.price
-                        }));
-                        const { error: sizeError } = await supabaseClient
-                            .from('product_sizes')
-                            .insert(sizesPayload);
-                        if (sizeError) throw sizeError;
-                    }
-                }
-            } else if (Array.isArray(cat.items) && cat.items.length > 0) {
-                const itemsPayload = cat.items.map(item => ({
-                    category_id: insertedCat.id,
-                    name: item.name,
-                    price: item.price,
-                    description: item.description || '',
-                    volume: item.volume || null,
-                    flavor: item.flavor || null,
-                    group_name: item.group || null,
-                    frozen: !!item.frozen
-                }));
-                const { error: itemsError } = await supabaseClient
-                    .from('items')
-                    .insert(itemsPayload);
-                if (itemsError) throw itemsError;
+        // 3) Одним запросом вставляем ВСЕ обычные товары / товары с объёмом-вкусом
+        if (itemsPayload.length > 0) {
+            const { error: itemsError } = await supabaseClient.from('items').insert(itemsPayload);
+            if (itemsError) throw itemsError;
+        }
+
+        // 4) Одним запросом вставляем ВСЕ продукты (напр. Холодные напитки), получаем их id
+        if (productsPayload.length > 0) {
+            const { data: insertedProducts, error: prodError } = await supabaseClient
+                .from('products')
+                .insert(productsPayload)
+                .select();
+            if (prodError) throw prodError;
+
+            // 5) Одним запросом вставляем ВСЕ размеры для всех продуктов сразу
+            const sizesPayload = [];
+            insertedProducts.forEach((product, idx) => {
+                sizesByProductPosition[idx].forEach(size => {
+                    sizesPayload.push({
+                        product_id: product.id,
+                        volume: size.volume,
+                        price: size.price
+                    });
+                });
+            });
+            if (sizesPayload.length > 0) {
+                const { error: sizeError } = await supabaseClient.from('product_sizes').insert(sizesPayload);
+                if (sizeError) throw sizeError;
             }
         }
 

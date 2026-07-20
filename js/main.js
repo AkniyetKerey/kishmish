@@ -277,10 +277,15 @@ async function init() {
     initSelectionGuards();
     initThemeToggle();
 
-    // Меню теперь приходит через сервисный слой api.js — сейчас это
-    // заглушка на data.js, позже здесь же появится реальный запрос к Supabase
-    const menu = await api.getMenu();
-    initMenu(menu);
+    // Меню приходит через сервисный слой api.js (локальная заглушка или Supabase).
+    // Оборачиваем в try/catch: даже если рендер меню упадёт из-за кривых данных,
+    // это не должно мешать остальной инициализации — теме, корзине, кнопкам.
+    try {
+        const menu = await api.getMenu();
+        initMenu(menu);
+    } catch (e) {
+        console.error('Не удалось загрузить/отрисовать меню:', e);
+    }
 
     initDeliveryTabs();
     initClearCartButton();
