@@ -97,9 +97,20 @@ function editItem(catIndex, itemIndex) {
 
 function deleteItem(catIndex, itemIndex) {
     const item = categories[catIndex].items[itemIndex];
-    if (!confirm(`Удалить товар "${item.name}"?`)) return;
+    if (!confirm(`Удалить товар "${item.name}" НАВСЕГДА? Если хотите временно скрыть — используйте заморозку (❄️) вместо удаления.`)) return;
 
     categories[catIndex].items.splice(itemIndex, 1);
+    persistAndRender();
+}
+
+/**
+ * Замораживает/размораживает товар. Замороженный товар не показывается
+ * на сайте (см. фильтры в menu.js), но остаётся в базе как есть — со всеми
+ * полями (название, цена, описание), чтобы не набирать всё заново при возврате.
+ */
+function toggleFreezeItem(catIndex, itemIndex) {
+    const item = categories[catIndex].items[itemIndex];
+    item.frozen = !item.frozen;
     persistAndRender();
 }
 
@@ -122,6 +133,23 @@ function editRawJson(catIndex) {
     }
 }
 
+/** Переносит текущее меню из data.js в БД (Supabase или localStorage) — разовое действие */
+async function migrateFromDataJs() {
+    if (typeof menuData === 'undefined' || menuData.length === 0) {
+        alert('data.js не найден или пуст — переносить нечего.');
+        return;
+    }
+    if (!confirm(`Перенести меню из data.js (${menuData.length} категорий) в базу для текущего филиала? Это ЗАМЕНИТ то, что сейчас там сохранено.`)) return;
+
+    const result = await api.saveMenu(currentBranch, menuData);
+    if (!result.success) {
+        alert('Не удалось перенести: ' + (result.error || 'неизвестная ошибка'));
+        return;
+    }
+    alert('Готово! Меню перенесено.');
+    await switchBranch(currentBranch);
+}
+
 // ---- Рендер -----------------------------------------------------------
 
 function renderBranchTabs() {
@@ -138,15 +166,19 @@ function renderBranchTabs() {
 
 function renderSimpleCategory(cat, catIndex) {
     const itemsHtml = cat.items.map((item, itemIndex) => `
-        <div class="admin-item-row">
+        <div class="admin-item-row ${item.frozen ? 'admin-item-frozen' : ''}">
             <div class="admin-item-info">
-                <span class="admin-item-name">${item.name}</span>
+                <span class="admin-item-name">${item.frozen ? '❄️ ' : ''}${item.name}</span>
                 <span class="admin-item-price">${item.price} тг</span>
                 ${item.description ? `<span class="admin-item-desc">${item.description}</span>` : ''}
+                ${item.frozen ? '<span class="admin-item-frozen-label">Заморожено — скрыто с сайта</span>' : ''}
             </div>
             <div class="admin-item-actions">
-                <button onclick="editItem(${catIndex}, ${itemIndex})">✏️</button>
-                <button onclick="deleteItem(${catIndex}, ${itemIndex})">🗑️</button>
+                <button onclick="toggleFreezeItem(${catIndex}, ${itemIndex})" title="${item.frozen ? 'Разморозить' : 'Заморозить (скрыть с сайта, не удаляя)'}">
+                    ${item.frozen ? '🔥' : '❄️'}
+                </button>
+                <button onclick="editItem(${catIndex}, ${itemIndex})" title="Редактировать">✏️</button>
+                <button onclick="deleteItem(${catIndex}, ${itemIndex})" title="Удалить навсегда">🗑️</button>
             </div>
         </div>
     `).join('') || '<p class="admin-empty-hint">Пока нет товаров в этой категории</p>';
@@ -191,10 +223,16 @@ function renderCategories() {
 }
 
 function render() {
+    const sharedNotice = typeof SHARE_MENU_ACROSS_BRANCHES !== 'undefined' && SHARE_MENU_ACROSS_BRANCHES
+        ? `<p class="admin-shared-notice">ℹ️ Сейчас меню общее для всех точек — изменения на любой вкладке применяются сразу ко всем филиалам.</p>`
+        : '';
+
     root.innerHTML = `
         ${renderBranchTabs()}
+        ${sharedNotice}
         <div class="admin-toolbar">
             <button class="admin-add-btn admin-add-category-btn" onclick="addCategory()">+ Добавить категорию</button>
+            <button class="admin-add-btn" onclick="migrateFromDataJs()">⬆️ Загрузить меню из data.js</button>
         </div>
         <div class="admin-categories">
             ${renderCategories()}
