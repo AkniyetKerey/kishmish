@@ -77,81 +77,100 @@ async function getMenu(branch) {
         return MENU_BY_BRANCH[targetBranch] || [];
     }
 
-    // --- Реальный запрос к Supabase -------------------------------------
+    // Бесплатный проект Supabase может "засыпать" при простое — первый запрос
+    // после паузы иногда не успевает/срывается, а повторный уже проходит
+    // нормально. Поэтому при неудаче пробуем ещё раз один раз перед тем,
+    // как показать пустое меню.
     try {
-        const { data: cats, error: catError } = await supabaseClient
-            .from('categories')
-            .select('*')
-            .eq('branch', targetBranch)
-            .order('sort_order', { ascending: true });
-        if (catError) throw catError;
+        return await fetchMenuFromSupabase(targetBranch);
+    } catch (err) {
+        console.error('Ошибка загрузки меню из Supabase, пробуем ещё раз через 1.5с:', err);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        try {
+            return await fetchMenuFromSupabase(targetBranch);
+        } catch (err2) {
+            console.error('Повторная попытка загрузки меню тоже не удалась:', err2);
+            return [];
+        }
+    }
+}
 
-        const result = [];
+async function fetchMenuFromSupabase(targetBranch) {
+    const { data: cats, error: catError } = await supabaseClient
+        .from('categories')
+        .select('*')
+        .eq('branch', targetBranch)
+        .order('sort_order', { ascending: true });
+    if (catError) throw catError;
 
-        for (const cat of cats) {
-            const category = { category: cat.category };
-            if (cat.has_variants) category.hasVariants = true;
-            if (cat.has_size_picker) category.hasSizePicker = true;
-            if (cat.volumes) category.volumes = cat.volumes;
+    if (cats.length === 0) return [];
 
-            if (cat.has_size_picker) {
-                // Холодные напитки и подобные: товары со своим набором размеров
-                const { data: products, error: prodError } = await supabaseClient
-                    .from('products')
-                    .select('*, product_sizes(*)')
-                    .eq('category_id', cat.id);
-                if (prodError) throw prodError;
+    // Дальше — ВСЕГО 2 запроса суммарно (а не по одному на каждую категорию).
+    // При 27+ категориях запрос "по одной" делал бы 28+ последовательных
+    // запросов подряд — это медленно и на нестабильном соединении может
+    // выглядеть так, будто меню "то появляется, то пропадает".
+    const catIds = cats.map(c => c.id);
 
-                category.products = products.map(p => ({
-                    name: p.name,
-                    frozen: p.frozen,
-                    sizes: (p.product_sizes || [])
-                        .slice()
-                        .sort((a, b) => a.id - b.id)
-                        .map(s => ({ id: s.id, volume: s.volume, price: s.price }))
-                }));
+    const { data: allItems, error: itemsError } = await supabaseClient
+        .from('items')
+        .select('*')
+        .in('category_id', catIds);
+    if (itemsError) throw itemsError;
 
-                // Плоский список для корзины/оформления заказа (как в data.js)
-                category.items = products.flatMap(p =>
-                    (p.product_sizes || []).map(s => ({
-                        id: s.id,
-                        name: `${p.name} (${s.volume})`,
-                        price: s.price,
-                        description: '',
-                        frozen: p.frozen
-                    }))
-                );
-            } else {
-                // Обычные товары или товары с объёмом/вкусом (hasVariants)
-                const { data: items, error: itemError } = await supabaseClient
-                    .from('items')
-                    .select('*')
-                    .eq('category_id', cat.id);
-                if (itemError) throw itemError;
+    const { data: allProducts, error: prodError } = await supabaseClient
+        .from('products')
+        .select('*, product_sizes(*)')
+        .in('category_id', catIds);
+    if (prodError) throw prodError;
 
-                category.items = items.map(i => {
-                    const item = {
-                        id: i.id,
-                        name: i.name,
-                        price: i.price,
-                        description: i.description || '',
-                        frozen: i.frozen
-                    };
-                    if (i.volume) item.volume = i.volume;
-                    if (i.flavor) item.flavor = i.flavor;
-                    if (i.group_name) item.group = i.group_name;
-                    return item;
-                });
-            }
+    return cats.map(cat => {
+        const category = { category: cat.category };
+        if (cat.has_variants) category.hasVariants = true;
+        if (cat.has_size_picker) category.hasSizePicker = true;
+        if (cat.volumes) category.volumes = cat.volumes;
 
-            result.push(category);
+        if (cat.has_size_picker) {
+            const products = allProducts.filter(p => p.category_id === cat.id);
+
+            category.products = products.map(p => ({
+                name: p.name,
+                frozen: p.frozen,
+                sizes: (p.product_sizes || [])
+                    .slice()
+                    .sort((a, b) => a.id - b.id)
+                    .map(s => ({ id: s.id, volume: s.volume, price: s.price }))
+            }));
+
+            // Плоский список для корзины/оформления заказа (как в data.js)
+            category.items = products.flatMap(p =>
+                (p.product_sizes || []).map(s => ({
+                    id: s.id,
+                    name: `${p.name} (${s.volume})`,
+                    price: s.price,
+                    description: '',
+                    frozen: p.frozen
+                }))
+            );
+        } else {
+            const items = allItems.filter(i => i.category_id === cat.id);
+
+            category.items = items.map(i => {
+                const item = {
+                    id: i.id,
+                    name: i.name,
+                    price: i.price,
+                    description: i.description || '',
+                    frozen: i.frozen
+                };
+                if (i.volume) item.volume = i.volume;
+                if (i.flavor) item.flavor = i.flavor;
+                if (i.group_name) item.group = i.group_name;
+                return item;
+            });
         }
 
-        return result;
-    } catch (err) {
-        console.error('Ошибка загрузки меню из Supabase:', err);
-        return [];
-    }
+        return category;
+    });
 }
 
 /**
@@ -173,107 +192,21 @@ async function saveMenu(branch, categories) {
     }
 
     // --- Реальное сохранение в Supabase -----------------------------------
-    // Стратегия — полная перезапись: удаляем все категории филиала (items/
-    // products/product_sizes удалятся сами через "on delete cascade" в схеме),
-    // затем вставляем всё заново из текущего состояния админки. Так админка
-    // не должна отслеживать, что именно изменилось — она просто каждый раз
-    // отдаёт актуальный полный список категорий.
-    //
-    // Важно: вставляем ПАЧКАМИ (одним запросом на всю таблицу), а не по одной
-    // строке за раз. Раньше здесь был цикл с insert() на каждую категорию/
-    // товар/продукт по отдельности — для реального меню (300+ позиций) это
-    // означало 60+ последовательных запросов, что и медленно, и рискованно:
-    // если пользователь в нетерпении нажимал кнопку сохранения ещё раз, два
-    // параллельных сохранения начинали мешать друг другу (один удалял то,
-    // что второй только что вставил) — отсюда 409 Conflict и задвоенные категории.
-    // Сейчас весь перенос — это максимум 5 запросов, независимо от размера меню.
+    // Вызываем ОДНУ хранимую функцию replace_branch_menu (см. supabase/functions.sql),
+    // которая делает удаление старых данных + вставку новых ВНУТРИ ОДНОЙ
+    // транзакции на стороне базы. Это принципиально надёжнее, чем несколько
+    // последовательных запросов из браузера: раньше, если что-то обрывалось
+    // на середине (медленный интернет, "холодный старт" бесплатного проекта
+    // Supabase после простоя, повторный клик), часть данных успевала
+    // записаться, а часть нет — отсюда были дубли категорий и товары,
+    // ссылающиеся на уже не существующую категорию. Транзакция в БД делает
+    // такое в принципе невозможным: либо сохранится ВСЁ, либо ничего.
     try {
-        const { error: delError } = await supabaseClient
-            .from('categories')
-            .delete()
-            .eq('branch', targetBranch);
-        if (delError) throw delError;
-
-        if (categories.length === 0) return { success: true };
-
-        // 1) Вставляем ВСЕ категории одним запросом, получаем их id одним ответом
-        const categoriesPayload = categories.map((cat, i) => ({
-            branch: targetBranch,
-            category: cat.category,
-            has_variants: !!cat.hasVariants,
-            has_size_picker: !!cat.hasSizePicker,
-            volumes: cat.volumes || null,
-            sort_order: i
-        }));
-        const { data: insertedCats, error: catError } = await supabaseClient
-            .from('categories')
-            .insert(categoriesPayload)
-            .select();
-        if (catError) throw catError;
-
-        // 2) Собираем общие списки товаров/продуктов по ВСЕМ категориям сразу
-        const itemsPayload = [];
-        const productsPayload = [];
-        const sizesByProductPosition = []; // sizes[], по индексу совпадает с productsPayload
-
-        categories.forEach((cat, catIdx) => {
-            const insertedCat = insertedCats[catIdx];
-
-            if (cat.hasSizePicker && Array.isArray(cat.products)) {
-                cat.products.forEach(product => {
-                    productsPayload.push({
-                        category_id: insertedCat.id,
-                        name: product.name,
-                        frozen: !!product.frozen
-                    });
-                    sizesByProductPosition.push(Array.isArray(product.sizes) ? product.sizes : []);
-                });
-            } else if (Array.isArray(cat.items)) {
-                cat.items.forEach(item => {
-                    itemsPayload.push({
-                        category_id: insertedCat.id,
-                        name: item.name,
-                        price: item.price,
-                        description: item.description || '',
-                        volume: item.volume || null,
-                        flavor: item.flavor || null,
-                        group_name: item.group || null,
-                        frozen: !!item.frozen
-                    });
-                });
-            }
+        const { error } = await supabaseClient.rpc('replace_branch_menu', {
+            target_branch: targetBranch,
+            payload: categories
         });
-
-        // 3) Одним запросом вставляем ВСЕ обычные товары / товары с объёмом-вкусом
-        if (itemsPayload.length > 0) {
-            const { error: itemsError } = await supabaseClient.from('items').insert(itemsPayload);
-            if (itemsError) throw itemsError;
-        }
-
-        // 4) Одним запросом вставляем ВСЕ продукты (напр. Холодные напитки), получаем их id
-        if (productsPayload.length > 0) {
-            const { data: insertedProducts, error: prodError } = await supabaseClient
-                .from('products')
-                .insert(productsPayload)
-                .select();
-            if (prodError) throw prodError;
-
-            // 5) Одним запросом вставляем ВСЕ размеры для всех продуктов сразу
-            const sizesPayload = [];
-            insertedProducts.forEach((product, idx) => {
-                sizesByProductPosition[idx].forEach(size => {
-                    sizesPayload.push({
-                        product_id: product.id,
-                        volume: size.volume,
-                        price: size.price
-                    });
-                });
-            });
-            if (sizesPayload.length > 0) {
-                const { error: sizeError } = await supabaseClient.from('product_sizes').insert(sizesPayload);
-                if (sizeError) throw sizeError;
-            }
-        }
+        if (error) throw error;
 
         return { success: true };
     } catch (err) {

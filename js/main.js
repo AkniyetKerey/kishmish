@@ -89,6 +89,29 @@ function saveState() {
     localStorage.setItem(STORAGE_KEYS.state, JSON.stringify(state));
 }
 
+/**
+ * Восстанавливает только тему — вызывается СРАЗУ при загрузке страницы,
+ * ещё до запроса меню. Раньше тема восстанавливалась внутри loadState(),
+ * которая вызывалась ПОСЛЕ загрузки меню — если меню грузилось долго
+ * (например, медленное соединение или временная задержка Supabase),
+ * страница на секунду-другую показывала светлую тему по умолчанию, что
+ * выглядело как "тема сбрасывается". Теперь это происходит мгновенно.
+ */
+function restoreTheme() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEYS.state);
+        if (!saved) return;
+        const state = JSON.parse(saved);
+        if (state.theme) {
+            document.documentElement.setAttribute('data-theme', state.theme);
+            const themeToggle = document.getElementById('theme-toggle');
+            if (themeToggle) themeToggle.textContent = state.theme === 'light' ? '🌙' : '☀️';
+        }
+    } catch (e) {
+        console.error('Ошибка восстановления темы:', e);
+    }
+}
+
 function loadState() {
     const saved = localStorage.getItem(STORAGE_KEYS.state);
     if (!saved) return;
@@ -96,10 +119,6 @@ function loadState() {
     try {
         const state = JSON.parse(saved);
 
-        if (state.theme) {
-            document.documentElement.setAttribute('data-theme', state.theme);
-            document.getElementById('theme-toggle').textContent = state.theme === 'light' ? '🌙' : '☀️';
-        }
         if (state.cart) cart = state.cart;
         if (state.orderType) currentOrderType = state.orderType;
         if (state.point) document.getElementById('point-select').value = state.point;
@@ -113,7 +132,7 @@ function loadState() {
         const addressInput = document.getElementById('address-input');
         addressInput.style.display = currentOrderType === 'pickup' ? 'none' : 'block';
 
-        // Счётчики товаров
+        // Счётчики товаров (актуально для карточек, уже отрисованных к этому моменту)
         for (const id in cart) {
             const countEl = document.getElementById(`count-${id}`);
             if (countEl) countEl.textContent = cart[id];
@@ -276,17 +295,13 @@ function initClearCartButton() {
 async function init() {
     initSelectionGuards();
     initThemeToggle();
+    restoreTheme(); // мгновенно, до загрузки меню — чтобы тема не "мигала" светлой на время загрузки
 
-    // Меню приходит через сервисный слой api.js (локальная заглушка или Supabase).
-    // Оборачиваем в try/catch: даже если рендер меню упадёт из-за кривых данных,
-    // это не должно мешать остальной инициализации — теме, корзине, кнопкам.
-    try {
-        const menu = await api.getMenu();
-        initMenu(menu);
-    } catch (e) {
-        console.error('Не удалось загрузить/отрисовать меню:', e);
-    }
-
+    // Всё, что не зависит от данных меню, настраиваем сразу — кнопки корзины,
+    // табы доставки/самовывоза, оформление заказа, восстановление состояния.
+    // Раньше это стояло ПОСЛЕ await api.getMenu(), и если Supabase отвечал
+    // медленно (например, "холодный старт" бесплатного проекта после
+    // простоя), вся корзина и кнопки не работали, пока меню не подгрузится.
     initDeliveryTabs();
     initClearCartButton();
     initOrderButton();
@@ -296,6 +311,17 @@ async function init() {
 
     loadState();
     syncPointSelectWithBranch();
+
+    // Меню грузится отдельно и не блокирует всё остальное. Оборачиваем
+    // в try/catch: даже если рендер меню упадёт из-за кривых данных, это
+    // не должно мешать уже настроенным теме/корзине/кнопкам.
+    try {
+        const menu = await api.getMenu();
+        initMenu(menu);
+        calculateTotal(); // пересчитываем итог теперь, когда menuItems заполнены (для товаров, оставшихся в корзине с прошлого визита)
+    } catch (e) {
+        console.error('Не удалось загрузить/отрисовать меню:', e);
+    }
 }
 
 init();

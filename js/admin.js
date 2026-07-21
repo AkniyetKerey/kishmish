@@ -12,6 +12,16 @@ let isSaving = false; // защита от повторного/параллел
 
 const root = document.getElementById('admin-root');
 
+// Предупреждаем при попытке закрыть/обновить страницу во время сохранения —
+// именно преждевременная перезагрузка страницы посреди долгого сохранения
+// и порождала повторные/параллельные запуски миграции в прошлый раз.
+window.addEventListener('beforeunload', (e) => {
+    if (isSaving) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
+
 /** Генерирует достаточно уникальный id для нового товара */
 function generateId() {
     return Date.now() + Math.floor(Math.random() * 1000);
