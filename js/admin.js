@@ -296,6 +296,57 @@ function render() {
     });
 }
 
+// ---- Авторизация (только когда USE_SUPABASE = true) ----------------------
+// В локальном режиме (заглушка на localStorage) настоящей защиты всё равно
+// быть не может — данные и так лежат только в этом браузере. Реальная
+// защита имеет смысл, только когда есть реальный сервер, который может
+// сам проверить пароль — поэтому логин через Supabase Auth включается
+// только при USE_SUPABASE = true.
+
+const loginScreen = document.getElementById('admin-login-screen');
+const loginError = document.getElementById('admin-login-error');
+
+async function handleAdminLogin() {
+    const email = document.getElementById('admin-email').value.trim();
+    const password = document.getElementById('admin-password').value;
+    loginError.textContent = '';
+
+    if (!email || !password) {
+        loginError.textContent = 'Введите email и пароль';
+        return;
+    }
+
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) {
+        loginError.textContent = 'Неверный email или пароль';
+        return;
+    }
+
+    showAdminPanel();
+}
+
+function showAdminPanel() {
+    loginScreen.classList.add('hidden');
+    root.classList.remove('hidden');
+    const logoutLink = document.getElementById('admin-logout-link');
+    if (logoutLink && USE_SUPABASE) logoutLink.classList.remove('hidden');
+    initAdmin();
+}
+
+function showLoginScreen() {
+    loginScreen.classList.remove('hidden');
+    root.classList.add('hidden');
+    const logoutLink = document.getElementById('admin-logout-link');
+    if (logoutLink) logoutLink.classList.add('hidden');
+}
+
+async function handleAdminLogout() {
+    if (USE_SUPABASE) {
+        await supabaseClient.auth.signOut();
+    }
+    showLoginScreen();
+}
+
 // ---- Точка входа --------------------------------------------------
 
 async function initAdmin() {
@@ -303,4 +354,22 @@ async function initAdmin() {
     render();
 }
 
-initAdmin();
+async function bootAdmin() {
+    if (!USE_SUPABASE) {
+        // Локальный режим — реальной защиты нет и быть не может, пускаем сразу
+        root.classList.remove('hidden');
+        initAdmin();
+        return;
+    }
+
+    // Проверяем, есть ли уже действующая сессия входа (не разлогинивает
+    // при каждом обновлении страницы)
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+        showAdminPanel();
+    } else {
+        showLoginScreen();
+    }
+}
+
+bootAdmin();

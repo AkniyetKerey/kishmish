@@ -12,10 +12,24 @@
     <div class="admin-page">
         <div class="admin-header">
             <h1>🛠️ Kish-Mish — Админка меню</h1>
-            <a href="index.html">← На сайт</a>
+            <div style="display:flex; gap:14px; align-items:center;">
+                <a href="#" id="admin-logout-link" onclick="handleAdminLogout(); return false;" class="hidden">Выйти</a>
+                <a href="index.html">← На сайт</a>
+            </div>
         </div>
 
-        <div id="admin-root">Загрузка…</div>
+        <!-- Экран входа: показывается, пока не пройдёт настоящая проверка через
+             Supabase Auth (сервер сам сверяет пароль — в отличие от пароля,
+             зашитого прямо в JS-файл, этот нельзя подсмотреть в исходном коде) -->
+        <div id="admin-login-screen" class="admin-login-screen hidden">
+            <h2>🔒 Вход в админку</h2>
+            <input type="email" id="admin-email" class="form-control" placeholder="Email" autocomplete="username">
+            <input type="password" id="admin-password" class="form-control" placeholder="Пароль" autocomplete="current-password">
+            <button class="admin-add-btn admin-add-category-btn" onclick="handleAdminLogin()">Войти</button>
+            <p id="admin-login-error" class="admin-login-error"></p>
+        </div>
+
+        <div id="admin-root" class="hidden">Загрузка…</div>
     </div>
 
     <!-- Порядок важен: config -> данные меню (заглушка) -> сервисный слой api -> admin -->

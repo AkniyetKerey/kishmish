@@ -19,6 +19,7 @@
         </a>
         <div class="header-controls">
             <button class="branch-badge" id="branch-badge" onclick="openBranchOverlay()">📍 Филиал</button>
+            <button class="branch-badge" id="photo-menu-btn" onclick="openPhotoMenu()">📷 Меню с фото</button>
             <button class="scroll-to-menu" onclick="document.getElementById('menu').scrollIntoView({behavior: 'smooth'})">Меню</button>
             <button class="theme-toggle" id="theme-toggle">🌙</button>
         </div>
@@ -31,7 +32,6 @@
         <div class="branch-list">
             <button class="branch-option" onclick="selectBranch('27-71')">Точка: 27-71</button>
             <button class="branch-option" onclick="selectBranch('28-63')">Точка: 28-63</button>
-            <button class="branch-option" onclick="selectBranch('17-95')">Точка: 17-95</button>
         </div>
         <button class="branch-badge" id="branch-cancel" style="margin-top: 22px; display: none;" onclick="closeBranchOverlay()">Отмена</button>
     </div>
@@ -42,7 +42,7 @@
     </div>
 
     <nav class="categories-nav" id="categories-nav"></nav>
-    <div id="menu"></div>
+    <div id="menu"><p class="loading-hint">Загружаем меню...</p></div>
 
     <!-- Плавающая корзина -->
     <div class="sticky-bar" id="sticky-bar">
