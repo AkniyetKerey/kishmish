@@ -56,9 +56,29 @@ function closeBranchOverlay() {
     if (overlay) overlay.classList.add('hidden');
 }
 
+/** Открывает графическое меню с фото (Canva) для текущей выбранной точки */
+function openPhotoMenu() {
+    let branch = null;
+    try { branch = localStorage.getItem(STORAGE_KEYS.branch); } catch (e) {}
+
+    const link = BRANCH_MENU_LINKS[branch];
+    if (!link) {
+        alert('Сначала выберите филиал — для него появится ссылка на меню с фото.');
+        return;
+    }
+    window.open(link, '_blank');
+}
+
 function initBranchOverlay() {
     let saved = null;
     try { saved = localStorage.getItem(STORAGE_KEYS.branch); } catch (e) {}
+
+    // Если сохранённая точка больше не существует (например, точку убрали
+    // с сайта, как 17-95) — считаем, что филиал не выбран, и просим выбрать заново
+    if (saved && !BRANCHES.includes(saved)) {
+        saved = null;
+        try { localStorage.removeItem(STORAGE_KEYS.branch); } catch (e) {}
+    }
 
     const overlay = document.getElementById('branch-overlay');
     const badge = document.getElementById('branch-badge');
@@ -272,7 +292,11 @@ function initOrderButton() {
         const currentTheme = document.documentElement.getAttribute('data-theme');
         localStorage.setItem(STORAGE_KEYS.state, JSON.stringify({ theme: currentTheme }));
 
-        window.location.href = `https://wa.me/${WHATSAPP_PHONE}?text=${encodedText}`;
+        // Номер WhatsApp свой для каждой точки — если для какой-то точки номер
+        // не задан в config.js, подстраховываемся первым номером из списка,
+        // чтобы заказ в любом случае куда-то дошёл, а не завис молча.
+        const phone = BRANCH_PHONES[point] || Object.values(BRANCH_PHONES)[0];
+        window.location.href = `https://wa.me/${phone}?text=${encodedText}`;
     });
 }
 
