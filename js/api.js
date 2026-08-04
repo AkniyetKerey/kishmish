@@ -24,21 +24,24 @@ if (USE_SUPABASE && typeof supabase !== 'undefined') {
     supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
-// Пока что у всех точек одинаковое меню (общая база на все филиалы).
-// Когда меню начнёт отличаться по точкам — просто поставь false,
-// и всё, что уже заложено (branch у каждой записи, MENU_BY_BRANCH,
-// отдельное хранение per-branch — и в localStorage, и в Supabase),
-// заработает само, без переписывания кода.
-const SHARE_MENU_ACROSS_BRANCHES = true;
+// Раньше у всех точек было одинаковое меню (общая база на все филиалы).
+// Оказалось, что реально меню отличается только ценами и отсутствием
+// части позиций — поэтому переключаем на независимые меню по филиалам.
+// Ниже есть разовая функция migrateSharedMenuToBranches(), которая
+// скопирует то, что сейчас реально стоит в общем меню (со всеми правками
+// и заморозками за последнее время), в оба филиала как стартовую точку —
+// дальше они редактируются уже независимо друг от друга.
+const SHARE_MENU_ACROSS_BRANCHES = false;
 
 // --- Меню по филиалам (локальная заглушка, когда USE_SUPABASE = false) ---
-// На заметку: то меню, что сейчас в data.js — это реальные данные точки
-// 28-63, а не 27-71. Пока SHARE_MENU_ACROSS_BRANCHES = true, это не важно —
-// оно используется как общее меню для всех точек.
+// 'shared' — это исторический общий набор данных (был единым меню для всех
+// точек), используется только источником для разовой миграции
+// (migrateSharedMenuToBranches). '27-71' и '28-63' — независимые меню
+// филиалов, наполняются через админку.
 const MENU_BY_BRANCH = {
-    shared: typeof menuData !== 'undefined' ? menuData : [], // общее меню (пока используется для всех точек)
-    '27-71': [], // TODO: когда меню начнёт отличаться — заполнить сюда (уже есть отдельное меню от заказчика — перенеси через админку)
-    '28-63': []  // TODO: когда меню начнёт отличаться — заполнить сюда
+    shared: typeof menuData !== 'undefined' ? menuData : [],
+    '27-71': [],
+    '28-63': []
 };
 
 // Ключ localStorage, под которым хранятся правки из админки (per-branch), пока USE_SUPABASE = false
@@ -56,6 +59,52 @@ function getCurrentBranch() {
 /** Ключ/значение branch, под которым реально хранится/читается меню — либо общее, либо per-branch */
 function resolveStorageBranch(branch) {
     return SHARE_MENU_ACROSS_BRANCHES ? 'shared' : (branch || getCurrentBranch());
+}
+
+/**
+ * Читает меню НАПРЯМУЮ по конкретному ключу хранения, в обход
+ * SHARE_MENU_ACROSS_BRANCHES/resolveStorageBranch. Нужна только для
+ * миграции — чтобы достать старое общее меню ('shared') именно как
+ * есть, независимо от текущего состояния флага.
+ */
+async function fetchRawMenuForStorageKey(storageKey) {
+    if (!USE_SUPABASE) {
+        try {
+            const stored = localStorage.getItem(ADMIN_MENU_PREFIX + storageKey);
+            if (stored) return JSON.parse(stored);
+        } catch (e) {
+            console.error('Не удалось прочитать сохранённое меню из localStorage:', e);
+        }
+        return MENU_BY_BRANCH[storageKey] || [];
+    }
+    return await fetchMenuFromSupabase(storageKey);
+}
+
+/**
+ * Разовая миграция: копирует то, что сейчас реально хранится под общим
+ * ключом 'shared' (со всеми правками/заморозками, накопленными за то
+ * время, пока меню было общим), в каждый филиал из BRANCHES как
+ * стартовую точку. После этого точки редактируются независимо.
+ *
+ * Вызывать один раз из админки после переключения
+ * SHARE_MENU_ACROSS_BRANCHES на false — иначе оба филиала окажутся
+ * с пустым меню, ведь раньше все данные писались под ключом 'shared',
+ * а не под конкретными branch.
+ */
+async function migrateSharedMenuToBranches() {
+    const sharedMenu = await fetchRawMenuForStorageKey('shared');
+    if (!sharedMenu || sharedMenu.length === 0) {
+        return { success: false, error: 'Общее меню пустое — переносить нечего' };
+    }
+
+    for (const branch of BRANCHES) {
+        const result = await saveMenu(branch, sharedMenu);
+        if (!result.success) {
+            return { success: false, error: `Не удалось перенести в ${branch}: ${result.error}` };
+        }
+    }
+
+    return { success: true, categoriesCount: sharedMenu.length };
 }
 
 /**
@@ -257,5 +306,6 @@ async function placeOrder(orderData) {
 const api = {
     getMenu,
     saveMenu,
-    placeOrder
+    placeOrder,
+    migrateSharedMenuToBranches
 };

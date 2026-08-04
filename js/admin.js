@@ -202,6 +202,35 @@ async function migrateFromDataJs() {
     await switchBranch(currentBranch);
 }
 
+/**
+ * Разово копирует то, что сейчас реально лежит в общем меню (со всеми
+ * правками и заморозками, накопленными за то время, пока меню было
+ * общим), в каждый филиал по отдельности. После этого точки становятся
+ * полностью независимыми — правки на одной больше не затрагивают другую.
+ */
+async function migrateSharedToBranchesHandler() {
+    if (isSaving) {
+        alert('Сохранение уже идёт, подождите несколько секунд и попробуйте снова.');
+        return;
+    }
+    if (!confirm(`Скопировать текущее общее меню в оба филиала (${BRANCHES.join(', ')}) как стартовую точку? Дальше их можно будет редактировать независимо. Если в филиалах уже что-то есть — это будет ЗАМЕНЕНО.`)) return;
+
+    isSaving = true;
+    renderSavingOverlay();
+
+    const result = await api.migrateSharedMenuToBranches();
+
+    isSaving = false;
+
+    if (!result.success) {
+        alert('Не удалось разделить меню: ' + (result.error || 'неизвестная ошибка'));
+        render();
+        return;
+    }
+    alert(`Готово! ${result.categoriesCount} категорий скопированы в оба филиала. Теперь они независимы.`);
+    await switchBranch(currentBranch);
+}
+
 // ---- Рендер -----------------------------------------------------------
 
 function renderBranchTabs() {
@@ -285,6 +314,7 @@ function render() {
         <div class="admin-toolbar">
             <button class="admin-add-btn admin-add-category-btn" onclick="addCategory()">+ Добавить категорию</button>
             <button class="admin-add-btn" onclick="migrateFromDataJs()">⬆️ Загрузить меню из data.js</button>
+            <button class="admin-add-btn" onclick="migrateSharedToBranchesHandler()">🔀 Разделить общее меню на филиалы (разово)</button>
         </div>
         <div class="admin-categories">
             ${renderCategories()}
