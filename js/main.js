@@ -39,6 +39,19 @@ function normalizeStoredState() {
 
 normalizeStoredState();
 
+// Высота шапки и корзины меняется при переносе текста и масштабировании.
+function initLayoutMeasurements() {
+    if (typeof ResizeObserver === 'undefined') return;
+    const header = document.querySelector('header');
+    const bar = document.getElementById('sticky-bar');
+    const observer = new ResizeObserver(() => {
+        document.documentElement.style.setProperty('--header-height', `${header.getBoundingClientRect().height}px`);
+        document.documentElement.style.setProperty('--cart-space', `${bar.getBoundingClientRect().height + 50}px`);
+    });
+    observer.observe(header);
+    observer.observe(bar);
+}
+
 // ---- Сохранение/восстановление состояния --------------------
 
 function saveState() {
@@ -245,6 +258,7 @@ function initClearCartButton() {
 // ---- Точка входа --------------------------------------------------
 
 async function init() {
+    initLayoutMeasurements();
     initSelectionGuards();
     initThemeToggle();
     restoreTheme(); // мгновенно, до загрузки меню — чтобы тема не "мигала" светлой на время загрузки
