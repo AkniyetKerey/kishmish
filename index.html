@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Kaushan+Script&display=swap" rel="stylesheet">
     <link rel="shortcut icon" href="./logo.png" type="image/png">
     <link rel="icon" href="./logo.png" type="image/png">
-    <link rel="stylesheet" href="css/style.css?v=5">
+    <link rel="stylesheet" href="css/style.css?v=6">
 </head>
 <body oncontextmenu="return false;">
 
@@ -18,23 +18,12 @@
             <span class="logo-text">Kish-Mish</span>
         </a>
         <div class="header-controls">
-            <button class="branch-badge" id="branch-badge" onclick="openBranchOverlay()">📍 Филиал</button>
-            <button class="branch-badge" id="photo-menu-btn" onclick="openPhotoMenu()">📷 Меню с фото</button>
+            <span class="location-badge">📍 28-63</span>
+            <button class="photo-menu-btn" id="photo-menu-btn" onclick="openPhotoMenu()">📷 Меню с фото</button>
             <button class="scroll-to-menu" onclick="document.getElementById('menu').scrollIntoView({behavior: 'smooth'})">Меню</button>
             <button class="theme-toggle" id="theme-toggle">🌙</button>
         </div>
     </header>
-
-    <!-- Экран выбора филиала -->
-    <div class="branch-overlay" id="branch-overlay">
-        <h2>Выберите филиал 📍</h2>
-        <p>Меню и способ оформления заказа зависят от выбранной точки. Вы всегда сможете сменить её позже.</p>
-        <div class="branch-list">
-            <button class="branch-option" onclick="selectBranch('27-71')">Точка: 27-71</button>
-            <button class="branch-option" onclick="selectBranch('28-63')">Точка: 28-63</button>
-        </div>
-        <button class="branch-badge" id="branch-cancel" style="margin-top: 22px; display: none;" onclick="closeBranchOverlay()">Отмена</button>
-    </div>
 
     <div class="hero">
         <h1>Добро пожаловать! 🍵</h1>
@@ -56,7 +45,6 @@
             </div>
 
             <div class="delivery-fields" id="delivery-fields">
-                <input type="hidden" id="point-select" value="27-71">
                 <input type="text" class="form-control" id="address-input" placeholder="Улица, дом, квартира" />
             </div>
         </div>
@@ -83,14 +71,14 @@
     </footer>
 
     <!-- Порядок важен: config -> данные меню -> сервисный слой api -> корзина -> меню -> main (инициализация) -->
-    <!-- ?v=5 у каждого файла — защита от кэша браузера. При следующем обновлении
-         кода просто увеличь цифру у ВСЕХ файлов разом (например на v=5) -->
+    <!-- ?v=6 у каждого файла — защита от кэша браузера. При следующем обновлении
+         кода просто увеличь цифру у ВСЕХ файлов разом (например на v=7) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/config.js?v=5"></script>
-    <script src="data.js?v=5"></script>
-    <script src="js/api.js?v=5"></script>
-    <script src="js/cart.js?v=5"></script>
-    <script src="js/menu.js?v=5"></script>
-    <script src="js/main.js?v=5"></script>
+    <script src="js/config.js?v=6"></script>
+    <script src="data.js?v=6"></script>
+    <script src="js/api.js?v=6"></script>
+    <script src="js/cart.js?v=6"></script>
+    <script src="js/menu.js?v=6"></script>
+    <script src="js/main.js?v=6"></script>
 </body>
 </html>

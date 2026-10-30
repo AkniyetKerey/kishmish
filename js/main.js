@@ -4,96 +4,40 @@
 // Зависит от: cart.js, menu.js, config.js
 // ============================================================
 
-// ---- Выбор филиала -----------------------------------------
-// Эта часть намеренно стоит в самом начале файла и ни от чего
-// не зависит (кроме DOM и localStorage). Так кнопки выбора точки
-// гарантированно работают, даже если ниже в файле что-то сломается.
+// ---- Меню с фото --------------------------------------------
 
-function selectBranch(branch) {
-    let previousBranch = null;
-    try { previousBranch = localStorage.getItem(STORAGE_KEYS.branch); } catch (e) {}
-
-    try { localStorage.setItem(STORAGE_KEYS.branch, branch); } catch (e) {}
-
-    const overlay = document.getElementById('branch-overlay');
-    if (overlay) overlay.classList.add('hidden');
-
-    // Если точка реально сменилась (а не выбрана впервые) — чистим корзину,
-    // чтобы оператор не путался из-за товаров с другой точки/меню
-    if (previousBranch && previousBranch !== branch) {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEYS.state);
-            if (raw) {
-                const state = JSON.parse(raw);
-                state.cart = {};
-                state.point = branch;
-                localStorage.setItem(STORAGE_KEYS.state, JSON.stringify(state));
-            }
-        } catch (e) {}
-
-        alert(`Точка изменена на ${branch}. Корзина была очищена, так как на другой точке меню может отличаться.`);
-    }
-
-    // Перезагружаем страницу в любом случае (даже при первом выборе) —
-    // у каждой точки своё меню, и его нужно заново запросить через api.getMenu()
-    // с уже сохранённым branch, а не полагаться на то, что успело отрисоваться
-    // при самой первой загрузке страницы (тогда branch ещё не был известен).
-    window.location.reload();
-}
-
-function openBranchOverlay() {
-    const overlay = document.getElementById('branch-overlay');
-    if (overlay) overlay.classList.remove('hidden');
-
-    const cancelBtn = document.getElementById('branch-cancel');
-    let saved = null;
-    try { saved = localStorage.getItem(STORAGE_KEYS.branch); } catch (e) {}
-    if (cancelBtn) cancelBtn.style.display = saved ? 'inline-block' : 'none';
-}
-
-function closeBranchOverlay() {
-    const overlay = document.getElementById('branch-overlay');
-    if (overlay) overlay.classList.add('hidden');
-}
-
-/** Открывает графическое меню с фото (Canva) для текущей выбранной точки */
 function openPhotoMenu() {
-    let branch = null;
-    try { branch = localStorage.getItem(STORAGE_KEYS.branch); } catch (e) {}
-
-    const link = BRANCH_MENU_LINKS[branch];
-    if (!link) {
-        alert('Сначала выберите филиал — для него появится ссылка на меню с фото.');
-        return;
-    }
-    window.open(link, '_blank');
+    window.open(PHOTO_MENU_LINK, '_blank');
 }
 
-function initBranchOverlay() {
-    let saved = null;
-    try { saved = localStorage.getItem(STORAGE_KEYS.branch); } catch (e) {}
-
-    // Если сохранённая точка больше не существует (например, точку убрали
-    // с сайта, как 17-95) — считаем, что филиал не выбран, и просим выбрать заново
-    if (saved && !BRANCHES.includes(saved)) {
-        saved = null;
-        try { localStorage.removeItem(STORAGE_KEYS.branch); } catch (e) {}
-    }
-
-    const overlay = document.getElementById('branch-overlay');
-    const badge = document.getElementById('branch-badge');
-    const pointSelect = document.getElementById('point-select');
-
-    if (saved) {
-        if (overlay) overlay.classList.add('hidden');
-        if (badge) badge.textContent = `📍 ${saved}`;
-        if (pointSelect) pointSelect.value = saved;
-    } else {
-        if (overlay) overlay.classList.remove('hidden');
+/** Обновляет сохранённое состояние перед восстановлением корзины. */
+function normalizeStoredState() {
+    try {
+        const savedBranch = localStorage.getItem('kishMishBranch');
+        const raw = localStorage.getItem(STORAGE_KEYS.state);
+        if (raw) {
+            const state = JSON.parse(raw);
+            if ((savedBranch && savedBranch !== BRANCH) || (state.point && state.point !== BRANCH)) {
+                state.cart = {};
+            }
+            state.point = BRANCH;
+            delete state.branchChosen;
+            localStorage.setItem(STORAGE_KEYS.state, JSON.stringify(state));
+        }
+        localStorage.removeItem('kishMishBranch');
+        // Удаляем локальные копии меню, которые не относятся к текущей точке.
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key.startsWith(ADMIN_MENU_PREFIX) && key !== ADMIN_MENU_PREFIX + BRANCH) {
+                localStorage.removeItem(key);
+            }
+        }
+    } catch (e) {
+        console.error('Не удалось обновить сохранённое состояние:', e);
     }
 }
 
-initBranchOverlay();
+normalizeStoredState();
 
 // ---- Сохранение/восстановление состояния --------------------
 
@@ -102,9 +46,8 @@ function saveState() {
         theme: document.documentElement.getAttribute('data-theme'),
         cart: cart,
         orderType: currentOrderType,
-        point: document.getElementById('point-select').value,
-        address: document.getElementById('address-input').value,
-        branchChosen: true
+        point: BRANCH,
+        address: document.getElementById('address-input').value
     };
     localStorage.setItem(STORAGE_KEYS.state, JSON.stringify(state));
 }
@@ -141,7 +84,6 @@ function loadState() {
 
         if (state.cart) cart = state.cart;
         if (state.orderType) currentOrderType = state.orderType;
-        if (state.point) document.getElementById('point-select').value = state.point;
         if (state.address) document.getElementById('address-input').value = state.address;
 
         // Табы доставки/самовывоза
@@ -161,16 +103,6 @@ function loadState() {
         calculateTotal();
     } catch (e) {
         console.error('Ошибка загрузки состояния:', e);
-    }
-}
-
-/** Подстраховка: если филиал уже выбран, но point-select ещё не был синхронизирован */
-function syncPointSelectWithBranch() {
-    let savedBranch = null;
-    try { savedBranch = localStorage.getItem(STORAGE_KEYS.branch); } catch (e) {}
-    const pointSelect = document.getElementById('point-select');
-    if (savedBranch && pointSelect) {
-        pointSelect.value = savedBranch;
     }
 }
 
@@ -221,7 +153,7 @@ function buildOrderText(summary, deliveryCost, containersCost) {
 
     text += `• Пластиковый контейнер (${summary.totalFoodItems} шт.) — ${containersCost} тг\n\n`;
 
-    const point = document.getElementById('point-select').value;
+    const point = BRANCH;
 
     if (currentOrderType === 'delivery') {
         const address = document.getElementById('address-input').value.trim();
@@ -256,7 +188,7 @@ function initOrderButton() {
             if (!proceed) return;
         }
 
-        const point = document.getElementById('point-select').value;
+        const point = BRANCH;
         const address = document.getElementById('address-input').value.trim();
 
         if (currentOrderType === 'delivery' && !address) {
@@ -270,8 +202,7 @@ function initOrderButton() {
         const finalTotal = summary.totalFoodPrice + containersCost + deliveryCost;
         const text = buildOrderText(summary, deliveryCost, containersCost);
 
-        // Передаём заказ в сервисный слой — сейчас это просто лог в консоль,
-        // после подключения Supabase здесь же появится реальная запись в БД
+        // Сохраняем заказ через сервисный слой.
         await api.placeOrder({
             items: summary.lines.map(({ item, qty, sum }) => ({
                 id: item.id, name: item.name, price: item.price, qty, sum
@@ -292,10 +223,7 @@ function initOrderButton() {
         const currentTheme = document.documentElement.getAttribute('data-theme');
         localStorage.setItem(STORAGE_KEYS.state, JSON.stringify({ theme: currentTheme }));
 
-        // Номер WhatsApp свой для каждой точки — если для какой-то точки номер
-        // не задан в config.js, подстраховываемся первым номером из списка,
-        // чтобы заказ в любом случае куда-то дошёл, а не завис молча.
-        const phone = BRANCH_PHONES[point] || Object.values(BRANCH_PHONES)[0];
+        const phone = WHATSAPP_PHONE;
         window.location.href = `https://wa.me/${phone}?text=${encodedText}`;
     });
 }
@@ -330,11 +258,9 @@ async function init() {
     initClearCartButton();
     initOrderButton();
 
-    document.getElementById('point-select').addEventListener('change', saveState);
     document.getElementById('address-input').addEventListener('input', saveState);
 
     loadState();
-    syncPointSelectWithBranch();
 
     // Меню грузится отдельно и не блокирует всё остальное. Оборачиваем
     // в try/catch: даже если рендер меню упадёт из-за кривых данных, это

@@ -1,12 +1,10 @@
 // ============================================================
 // admin.js — админка меню: полный CRUD категорий и товаров,
-// с переключением между филиалами (у каждого — своё меню).
+// для точки обслуживания.
 // Все чтения/записи идут через api.getMenu() / api.saveMenu()
-// (см. api.js) — сейчас это localStorage-заглушка, после
-// подключения Supabase этот файл менять не придётся.
+// (см. api.js), который работает с Supabase или локальными данными.
 // ============================================================
 
-let currentBranch = BRANCHES[0];
 let categories = [];
 let isSaving = false; // защита от повторного/параллельного сохранения (см. persistAndRender)
 
@@ -28,7 +26,7 @@ function generateId() {
 }
 
 /**
- * Сохраняет текущее состояние categories для currentBranch и перерисовывает экран.
+ * Сохраняет текущее состояние categories точки обслуживания и перерисовывает экран.
  *
  * Пока идёт сохранение — isSaving = true, и все действия (добавить/удалить/
  * заморозить и т.п.) блокируются с понятным сообщением. Раньше без этой
@@ -46,7 +44,7 @@ async function persistAndRender() {
     isSaving = true;
     renderSavingOverlay();
 
-    const result = await api.saveMenu(currentBranch, categories);
+    const result = await api.saveMenu(categories);
 
     isSaving = false;
 
@@ -59,18 +57,6 @@ async function persistAndRender() {
 /** Показывает простой индикатор "идёт сохранение" поверх админки */
 function renderSavingOverlay() {
     root.innerHTML = '<p class="admin-empty-hint">💾 Сохраняем изменения, не закрывайте страницу...</p>';
-}
-
-/** Переключение филиала в админке */
-async function switchBranch(branch) {
-    if (isSaving) {
-        alert('Дождитесь окончания сохранения перед переключением филиала.');
-        return;
-    }
-    currentBranch = branch;
-    renderSavingOverlay();
-    categories = await api.getMenu(branch);
-    render();
 }
 
 // ---- Категории -----------------------------------------------------
@@ -184,12 +170,12 @@ async function migrateFromDataJs() {
         alert('data.js не найден или пуст — переносить нечего.');
         return;
     }
-    if (!confirm(`Перенести меню из data.js (${menuData.length} категорий) в базу для текущего филиала? Это ЗАМЕНИТ то, что сейчас там сохранено.`)) return;
+    if (!confirm(`Перенести меню из data.js (${menuData.length} категорий) в базу точки обслуживания? Это ЗАМЕНИТ то, что сейчас там сохранено.`)) return;
 
     isSaving = true;
     renderSavingOverlay();
 
-    const result = await api.saveMenu(currentBranch, menuData);
+    const result = await api.saveMenu(menuData);
 
     isSaving = false;
 
@@ -199,51 +185,10 @@ async function migrateFromDataJs() {
         return;
     }
     alert('Готово! Меню перенесено.');
-    await switchBranch(currentBranch);
-}
-
-/**
- * Разово копирует то, что сейчас реально лежит в общем меню (со всеми
- * правками и заморозками, накопленными за то время, пока меню было
- * общим), в каждый филиал по отдельности. После этого точки становятся
- * полностью независимыми — правки на одной больше не затрагивают другую.
- */
-async function migrateSharedToBranchesHandler() {
-    if (isSaving) {
-        alert('Сохранение уже идёт, подождите несколько секунд и попробуйте снова.');
-        return;
-    }
-    if (!confirm(`Скопировать текущее общее меню в оба филиала (${BRANCHES.join(', ')}) как стартовую точку? Дальше их можно будет редактировать независимо. Если в филиалах уже что-то есть — это будет ЗАМЕНЕНО.`)) return;
-
-    isSaving = true;
-    renderSavingOverlay();
-
-    const result = await api.migrateSharedMenuToBranches();
-
-    isSaving = false;
-
-    if (!result.success) {
-        alert('Не удалось разделить меню: ' + (result.error || 'неизвестная ошибка'));
-        render();
-        return;
-    }
-    alert(`Готово! ${result.categoriesCount} категорий скопированы в оба филиала. Теперь они независимы.`);
-    await switchBranch(currentBranch);
+    await initAdmin();
 }
 
 // ---- Рендер -----------------------------------------------------------
-
-function renderBranchTabs() {
-    return `
-        <div class="admin-branch-tabs">
-            ${BRANCHES.map(b => `
-                <button class="admin-branch-tab ${b === currentBranch ? 'active' : ''}" data-branch="${b}">
-                    📍 ${b}
-                </button>
-            `).join('')}
-        </div>
-    `;
-}
 
 function renderSimpleCategory(cat, catIndex) {
     const itemsHtml = cat.items.map((item, itemIndex) => `
@@ -304,26 +249,15 @@ function renderCategories() {
 }
 
 function render() {
-    const sharedNotice = typeof SHARE_MENU_ACROSS_BRANCHES !== 'undefined' && SHARE_MENU_ACROSS_BRANCHES
-        ? `<p class="admin-shared-notice">ℹ️ Сейчас меню общее для всех точек — изменения на любой вкладке применяются сразу ко всем филиалам.</p>`
-        : '';
-
     root.innerHTML = `
-        ${renderBranchTabs()}
-        ${sharedNotice}
         <div class="admin-toolbar">
             <button class="admin-add-btn admin-add-category-btn" onclick="addCategory()">+ Добавить категорию</button>
             <button class="admin-add-btn" onclick="migrateFromDataJs()">⬆️ Загрузить меню из data.js</button>
-            <button class="admin-add-btn" onclick="migrateSharedToBranchesHandler()">🔀 Разделить общее меню на филиалы (разово)</button>
         </div>
         <div class="admin-categories">
             ${renderCategories()}
         </div>
     `;
-
-    root.querySelectorAll('.admin-branch-tab').forEach(btn => {
-        btn.addEventListener('click', () => switchBranch(btn.getAttribute('data-branch')));
-    });
 }
 
 // ---- Авторизация (только когда USE_SUPABASE = true) ----------------------
@@ -380,7 +314,7 @@ async function handleAdminLogout() {
 // ---- Точка входа --------------------------------------------------
 
 async function initAdmin() {
-    categories = await api.getMenu(currentBranch);
+    categories = await api.getMenu();
     render();
 }
 
